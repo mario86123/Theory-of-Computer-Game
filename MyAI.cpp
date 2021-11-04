@@ -237,12 +237,13 @@ void MyAI::generateMove(char move[6])
 	begin = clock();
 
 	// iterative-deeping, start from 3, time limit = <TIME_LIMIT> sec
+	// why depth start at 3 ??
 	for(int depth = 3; (double)(clock() - begin) / CLOCKS_PER_SEC < TIME_LIMIT; ++depth){
 		this->node = 0;
 		int best_move_tmp; double t_tmp;
 
 		// run Nega-max
-		t_tmp = Nega_max(this->main_chessboard, &best_move_tmp, this->Color, 0, depth);
+		t_tmp = Nega_max(this->main_chessboard, &best_move_tmp, this->Color, 0, depth, -DBL_MAX, DBL_MAX);
 		t_tmp -= OFFSET; // rescale
 
 		// check score
@@ -253,6 +254,7 @@ void MyAI::generateMove(char move[6])
 			StartPoint = best_move_tmp/100;
 			EndPoint   = best_move_tmp%100;
 			sprintf(move, "%c%c-%c%c",'a'+(StartPoint%4),'1'+(7-StartPoint/4),'a'+(EndPoint%4),'1'+(7-EndPoint/4));
+			// 'a' + 2 = c
 		}
 		// U: Undone
 		// D: Done
@@ -273,7 +275,7 @@ void MyAI::generateMove(char move[6])
 	printf("My result: \n--------------------------\n");
 	printf("Nega max: %lf (node: %d)\n", t, this->node);
 	printf("(%d) -> (%d)\n",StartPoint,EndPoint);
-	printf("<%s> -> <%s>\n",chess_Start,chess_End);
+	printf("<%s> -> <%s>\n",chess_Start,chess_End); // if chess_End != null, then attack happened
 	printf("move:%s\n",move);
 	printf("--------------------------\n");
 	this->Pirnf_Chessboard();
@@ -323,14 +325,14 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 	int ResultCount = 0;
 	for(int i=0;i<32;i++)
 	{
-		if(board[i] >= 0 && board[i]/7 == color)
+		if(board[i] >= 0 && board[i]/7 == color) // if (there is a piece at board i && is mine)
 		{
 			//Gun
 			if(board[i] % 7 == 1)
 			{
 				int row = i/4;
 				int col = i%4;
-				for(int rowCount=row*4;rowCount<(row+1)*4;rowCount++)
+				for(int rowCount=row*4;rowCount<(row+1)*4;rowCount++) // same row
 				{
 					if(Referee(board,i,rowCount,color))
 					{
@@ -338,7 +340,7 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 						ResultCount++;
 					}
 				}
-				for(int colCount=col; colCount<32;colCount += 4)
+				for(int colCount=col; colCount<32;colCount += 4) // same column
 				{
 				
 					if(Referee(board,i,colCount,color))
@@ -348,9 +350,12 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 					}
 				}
 			}
-			else
+			// important here (move ordering)
+			// else if () 
+
+			else // if my piece is not a gun
 			{
-				int Move[4] = {i-4,i+1,i+4,i-1};
+				int Move[4] = {i-4,i+1,i+4,i-1}; // down, right, up, right
 				for(int k=0; k<4;k++)
 				{
 					
@@ -368,7 +373,7 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 }
 
 
-// Referee
+// Referee (check if it is a legal move)
 bool MyAI::Referee(const int* chess, const int from_location_no, const int to_location_no, const int UserId)
 {
 	// int MessageNo = 0;
@@ -401,10 +406,11 @@ bool MyAI::Referee(const int* chess, const int from_location_no, const int to_lo
 	}
 	//check attack
 	else if(to_chess_no == CHESS_EMPTY && abs(from_row-to_row) + abs(from_col-to_col)  == 1)//legal move
+	// if there is not any piece at destination (legal move)	
 	{
 		IsCurrent = true;
 	}	
-	else if(from_chess_no % 7 == 1 ) //judge gun
+	else if(from_chess_no % 7 == 1 ) //judge gun (the piece I want to move is gun)
 	{
 		int row_gap = from_row-to_row;
 		int col_gap = from_col-to_col;
@@ -412,7 +418,11 @@ bool MyAI::Referee(const int* chess, const int from_location_no, const int to_lo
 		//slant
 		if(from_row-to_row == 0 || from_col-to_col == 0)
 		{
+			// it is not reasonable to determine the destination on row first
+
 			//row
+			// if starting point and destination are on the same row, 
+			// then count the piece amount in between
 			if(row_gap == 0) 
 			{
 				for(int i=1;i<abs(col_gap);i++)
@@ -427,6 +437,8 @@ bool MyAI::Referee(const int* chess, const int from_location_no, const int to_lo
 				}
 			}
 			//column
+			// if starting point and destination are on the same column, 
+			// then count the piece amount in between
 			else
 			{
 				for(int i=1;i<abs(row_gap);i++)
@@ -443,6 +455,7 @@ bool MyAI::Referee(const int* chess, const int from_location_no, const int to_lo
 			}
 			
 			if(between_Count != 1 )
+			// if there are more than two pieces or not any piece between starting point and destination
 			{
 				// MessageNo = 4;
 				//strcat(Message,"**gun can't eat opp without between one piece**");
@@ -468,7 +481,7 @@ bool MyAI::Referee(const int* chess, const int from_location_no, const int to_lo
 		//judge pawn or king
 
 		//distance
-		if( abs(from_row-to_row) + abs(from_col-to_col)  > 1)
+		if( abs(from_row-to_row) + abs(from_col-to_col)  > 1) // if not legal move
 		{
 			// MessageNo = 7;
 			//strcat(Message,"**cant eat**");
@@ -501,6 +514,7 @@ bool MyAI::Referee(const int* chess, const int from_location_no, const int to_lo
 	return IsCurrent;
 }
 
+// Evaluating function
 // always use my point of view, so use this->Color
 double MyAI::Evaluate(const ChessBoard* chessboard, 
 	const int legal_move_count, const int color){
@@ -526,7 +540,7 @@ double MyAI::Evaluate(const ChessBoard* chessboard,
 		static const double values[14] = {
 			  1,180,  6, 18, 90,270,810,  
 			  1,180,  6, 18, 90,270,810
-		};
+		}; // pawn, gun, hourse, car, elephant, offical, general
 		
 		double piece_value = 0;
 		for(int i = 0; i < 32; i++){
@@ -571,12 +585,13 @@ double MyAI::Evaluate(const ChessBoard* chessboard,
 	return score;
 }
 
-double MyAI::Nega_max(const ChessBoard chessboard, int* move, const int color, const int depth, const int remain_depth){
+double MyAI::Nega_max(const ChessBoard chessboard, int* move, const int color, const int depth, const int remain_depth, double alpha, double beta){
 
 	int Moves[2048];
 	int move_count = 0;
 
 	// move
+	// check every possible move and store them in Moves array
 	move_count = Expand(chessboard.Board, color, Moves);
 
 	if(isTimeUp() || // time is up
@@ -589,20 +604,25 @@ double MyAI::Nega_max(const ChessBoard chessboard, int* move, const int color, c
 		// odd: *-1, even: *1
 		return Evaluate(&chessboard, move_count, color) * (depth&1 ? -1 : 1);
 	}else{
-		double m = -DBL_MAX;
+		double m = alpha;
 		int new_move;
 		// search deeper
 		for(int i = 0; i < move_count; i++){ // move
 			ChessBoard new_chessboard = chessboard;
 			
 			MakeMove(&new_chessboard, Moves[i], 0); // 0: dummy
-			double t = -Nega_max(new_chessboard, &new_move, color^1, depth+1, remain_depth-1);
+			// move every possible move
+			double t = -Nega_max(new_chessboard, &new_move, color^1, depth+1, remain_depth-1, -beta, -m);
+			// c++ ^ operator is xor (color xor 1)
 			if(t > m){ 
 				m = t;
 				*move = Moves[i];
 			}else if(t == m){
 				bool r = rand()%2;
 				if(r) *move = Moves[i];
+			}
+			if (m >= beta) {
+				return beta;
 			}
 		}
 		return m;
@@ -745,5 +765,4 @@ void MyAI::Pirnf_Chess(int chess_no,char *Result){
 			break;
 	}
 }
-
 
