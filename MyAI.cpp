@@ -320,6 +320,59 @@ void MyAI::MakeMove(ChessBoard* chessboard, const char move[6])
 	Pirnf_Chessboard();
 }
 
+void sort_four(int a[]) {
+    int large_1, large_2, small_1, small_2;
+    if (a[0] > a[1]) {
+        large_1 = a[0];
+        small_1 = a[1];
+    } else {
+        large_1 = a[1];
+        small_1 = a[0];
+    }
+    
+    if (a[2] > a[3]) {
+        large_2 = a[2];
+        small_2 = a[3];
+    } else {
+        large_2 = a[3];
+        small_2 = a[2];
+    }
+    
+    if (large_1 > large_2) {
+        a[0] = large_1;
+        if (small_1 > small_2) {
+            a[3] = small_2;
+            if (large_2 > small_1) {
+                a[1] = large_2;
+                a[2] = small_1;
+            } else { // large_2 < small_1 && large_1 > large_2
+                a[2] = large_2;
+                a[1] = small_1;
+            }
+        } else {     // small_1 < small_2 && large_1 > large_2
+            a[1] = large_2;
+            a[2] = small_2;
+            a[3] = small_1;
+        }
+    } else { // large_1 < large_2
+        a[0] = large_2;
+        if (small_1 < small_2) { // small_1 < small_2 && large_1 < large_2
+            a[3] = small_1;
+            if (large_1 > small_2) {
+                a[1] = large_1;
+                a[2] = small_2;
+            } else {
+                a[2] = large_1;
+                a[1] = small_2;
+            }
+        } else {     // small_1 > small_2 && large_1 < large_2
+            a[1] = large_1;
+            a[2] = small_1;
+            a[3] = small_2;
+        }
+    }
+}
+
 int MyAI::Expand(const int* board, const int color,int *Result)
 {
 	int ResultCount = 0;
@@ -343,29 +396,45 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 			piece[tmp] = pos;
 		};
 	}
-
- 	// start from my king, i initialize to 15 if my color is red, else i initialize to 31
-	for (int i  = (color + 1) * 16 - 1; i >= color * 16; i--) {
-		
-		//Gun
-		if(i % 16 == 5 || i % 16 == 6)
+	// king's character_num = 15 or 31
+	for (int i = 15; i >= 15; i--) {
+		int character_num = color * 16 + i;
+		int Move[4] = {piece[character_num] - 4, piece[character_num] + 1,
+					   piece[character_num] + 4, piece[character_num] - 1};
+		sort_four(Move);
+		for(int k=0; k<4;k++)
 		{
-			int row = piece[i]/4;
-			int col = piece[i]%4;
+			if(Move[k] >= 0 && Move[k] < 32 && Referee(board,piece[character_num],Move[k],color))
+			{
+				Result[ResultCount] = piece[character_num]*100+Move[k];
+				ResultCount++;
+			}
+		}
+	}
+
+ 	// start from my offical, i initialize to 14 if my color is red, else i initialize to 30
+	for (int i = 14; i >= 5; i--) {
+		int character_num = color * 16 + i;
+
+		//Gun
+		if(character_num % 16 == 5 || character_num % 16 == 6)
+		{
+			int row = piece[character_num]/4;
+			int col = piece[character_num]%4;
 			for(int rowCount=row*4;rowCount<(row+1)*4;rowCount++) // same row
 			{
-				if(Referee(board,piece[i],rowCount,color))
+				if(Referee(board,piece[character_num],rowCount,color))
 				{
-					Result[ResultCount] = piece[i]*100+rowCount;
+					Result[ResultCount] = piece[character_num]*100+rowCount;
 					ResultCount++;
 				}
 			}
 			for(int colCount=col; colCount<32;colCount += 4) // same column
 			{
 			
-				if(Referee(board,piece[i],colCount,color))
+				if(Referee(board,piece[character_num],colCount,color))
 				{
-					Result[ResultCount] = piece[i]*100+colCount;
+					Result[ResultCount] = piece[character_num]*100+colCount;
 					ResultCount++;
 				}
 			}
@@ -373,65 +442,37 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 		// important here (move ordering)
 		else // if my piece is not a gun
 		{
-			int Move[4] = {piece[i]-4,piece[i]+1,piece[i]+4,piece[i]-1}; // down, right, up, right
+			int Move[4] = {piece[character_num]-4,piece[character_num]+1,piece[character_num]+4,piece[character_num]-1}; // down, right, up, right
+			sort_four(Move);
 			for(int k=0; k<4;k++)
 			{
-				if(Move[k] >= 0 && Move[k] < 32 && Referee(board,piece[i],Move[k],color))
+				if(Move[k] >= 0 && Move[k] < 32 && Referee(board,piece[character_num],Move[k],color))
 				{
-					Result[ResultCount] = piece[i]*100+Move[k];
+					Result[ResultCount] = piece[character_num]*100+Move[k];
 					ResultCount++;
 				}
 			}
 		}
 	}
 
-	// for(int i=0;i<32;i++)
-	// {
-	// 	if(board[i] >= 0 && board[i]/7 == color) // if (there is a piece at board i && is mine)
-	// 	{
-	// 		//Gun
-	// 		if(board[i] % 7 == 1)
-	// 		{
-	// 			int row = i/4;
-	// 			int col = i%4;
-	// 			for(int rowCount=row*4;rowCount<(row+1)*4;rowCount++) // same row
-	// 			{
-	// 				if(Referee(board,i,rowCount,color))
-	// 				{
-	// 					Result[ResultCount] = i*100+rowCount;
-	// 					ResultCount++;
-	// 				}
-	// 			}
-	// 			for(int colCount=col; colCount<32;colCount += 4) // same column
-	// 			{
-				
-	// 				if(Referee(board,i,colCount,color))
-	// 				{
-	// 					Result[ResultCount] = i*100+colCount;
-	// 					ResultCount++;
-	// 				}
-	// 			}
-	// 		}
-	// 		// important here (move ordering)
-	// 		else // if my piece is not a gun
-	// 		{
-	// 			int Move[4] = {i-4,i+1,i+4,i-1}; // down, right, up, right
-	// 			for(int k=0; k<4;k++)
-	// 			{
-	// 				if(Move[k] >= 0 && Move[k] < 32 && Referee(board,i,Move[k],color))
-	// 				{
-	// 					Result[ResultCount] = i*100+Move[k];
-	// 					ResultCount++;
-	// 				}
-	// 			}
-	// 		}
-		
-	// 	};
-	// }
+	// pawn's character_num = 0,1,2,3,4 or 16,17,18,19,20
+	for (int i = 4; i >= 0; i--) {
+		int character_num = color * 16 + i;
+		int Move[4] = {piece[character_num] - 4, piece[character_num] + 1,
+					   piece[character_num] + 4, piece[character_num] - 1}; // down, right, up, right
+		sort_four(Move);
+		for(int k=0; k<4;k++)
+		{
+			if(Move[k] >= 0 && Move[k] < 32 && Referee(board,piece[character_num],Move[k],color))
+			{
+				Result[ResultCount] = piece[character_num]*100+Move[k];
+				ResultCount++;
+			}
+		}
+	}
 	
 	return ResultCount;
 }
-
 
 // Referee (check if it is a legal move)
 bool MyAI::Referee(const int* chess, const int from_location_no, const int to_location_no, const int UserId)
