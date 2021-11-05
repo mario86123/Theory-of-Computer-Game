@@ -2,7 +2,7 @@
 #include "time.h"
 #include "MyAI.h"
 
-#define TIME_LIMIT 9.5
+#define TIME_LIMIT 9
 
 #define WIN 1.0
 #define DRAW 0.2
@@ -323,52 +323,112 @@ void MyAI::MakeMove(ChessBoard* chessboard, const char move[6])
 int MyAI::Expand(const int* board, const int color,int *Result)
 {
 	int ResultCount = 0;
-	for(int i=0;i<32;i++)
-	{
-		if(board[i] >= 0 && board[i]/7 == color) // if (there is a piece at board i && is mine)
-		{
-			//Gun
-			if(board[i] % 7 == 1)
-			{
-				int row = i/4;
-				int col = i%4;
-				for(int rowCount=row*4;rowCount<(row+1)*4;rowCount++) // same row
-				{
-					if(Referee(board,i,rowCount,color))
-					{
-						Result[ResultCount] = i*100+rowCount;
-						ResultCount++;
-					}
-				}
-				for(int colCount=col; colCount<32;colCount += 4) // same column
-				{
-				
-					if(Referee(board,i,colCount,color))
-					{
-						Result[ResultCount] = i*100+colCount;
-						ResultCount++;
-					}
-				}
-			}
-			// important here (move ordering)
-			// else if () 
 
-			else // if my piece is not a gun
-			{
-				int Move[4] = {i-4,i+1,i+4,i-1}; // down, right, up, right
-				for(int k=0; k<4;k++)
-				{
-					
-					if(Move[k] >= 0 && Move[k] < 32 && Referee(board,i,Move[k],color))
-					{
-						Result[ResultCount] = i*100+Move[k];
-						ResultCount++;
-					}
-				}
+	// store every piece position
+	int piece[32] = {-5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5,
+					 -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5};
+	
+	for(int pos=0;pos<32;pos++) {
+		if(board[pos] >= 0) { // if not empty or covered
+			int tmp;
+			if (board[pos] % 7 == 6) { // king
+				tmp = (board[pos] + board[pos] / 7) * 2 + 3;
+			} else {
+				tmp = (board[pos] + board[pos] / 7) * 2 + 4;
 			}
-		
+			
+			while (piece[tmp] >= 0) { // already have same character piece
+				tmp--;
+			}
+			piece[tmp] = pos;
 		};
 	}
+
+ 	// start from my king, i initialize to 15 if my color is red, else i initialize to 31
+	for (int i  = (color + 1) * 16 - 1; i >= color * 16; i--) {
+		
+		//Gun
+		if(i % 16 == 5 || i % 16 == 6)
+		{
+			int row = piece[i]/4;
+			int col = piece[i]%4;
+			for(int rowCount=row*4;rowCount<(row+1)*4;rowCount++) // same row
+			{
+				if(Referee(board,piece[i],rowCount,color))
+				{
+					Result[ResultCount] = piece[i]*100+rowCount;
+					ResultCount++;
+				}
+			}
+			for(int colCount=col; colCount<32;colCount += 4) // same column
+			{
+			
+				if(Referee(board,piece[i],colCount,color))
+				{
+					Result[ResultCount] = piece[i]*100+colCount;
+					ResultCount++;
+				}
+			}
+		}
+		// important here (move ordering)
+		else // if my piece is not a gun
+		{
+			int Move[4] = {piece[i]-4,piece[i]+1,piece[i]+4,piece[i]-1}; // down, right, up, right
+			for(int k=0; k<4;k++)
+			{
+				if(Move[k] >= 0 && Move[k] < 32 && Referee(board,piece[i],Move[k],color))
+				{
+					Result[ResultCount] = piece[i]*100+Move[k];
+					ResultCount++;
+				}
+			}
+		}
+	}
+
+	// for(int i=0;i<32;i++)
+	// {
+	// 	if(board[i] >= 0 && board[i]/7 == color) // if (there is a piece at board i && is mine)
+	// 	{
+	// 		//Gun
+	// 		if(board[i] % 7 == 1)
+	// 		{
+	// 			int row = i/4;
+	// 			int col = i%4;
+	// 			for(int rowCount=row*4;rowCount<(row+1)*4;rowCount++) // same row
+	// 			{
+	// 				if(Referee(board,i,rowCount,color))
+	// 				{
+	// 					Result[ResultCount] = i*100+rowCount;
+	// 					ResultCount++;
+	// 				}
+	// 			}
+	// 			for(int colCount=col; colCount<32;colCount += 4) // same column
+	// 			{
+				
+	// 				if(Referee(board,i,colCount,color))
+	// 				{
+	// 					Result[ResultCount] = i*100+colCount;
+	// 					ResultCount++;
+	// 				}
+	// 			}
+	// 		}
+	// 		// important here (move ordering)
+	// 		else // if my piece is not a gun
+	// 		{
+	// 			int Move[4] = {i-4,i+1,i+4,i-1}; // down, right, up, right
+	// 			for(int k=0; k<4;k++)
+	// 			{
+	// 				if(Move[k] >= 0 && Move[k] < 32 && Referee(board,i,Move[k],color))
+	// 				{
+	// 					Result[ResultCount] = i*100+Move[k];
+	// 					ResultCount++;
+	// 				}
+	// 			}
+	// 		}
+		
+	// 	};
+	// }
+	
 	return ResultCount;
 }
 
@@ -540,7 +600,7 @@ double MyAI::Evaluate(const ChessBoard* chessboard,
 		static const double values[14] = {
 			  1,180,  6, 18, 90,270,810,  
 			  1,180,  6, 18, 90,270,810
-		}; // pawn, gun, hourse, car, elephant, offical, general
+		}; // pawn, gun, hourse, car, elephant, offical, king
 		
 		double piece_value = 0;
 		for(int i = 0; i < 32; i++){
