@@ -381,7 +381,7 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 	int piece[32] = {-5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5,
 					 -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5};
 	
-	for(int pos=0;pos<32;pos++) {
+	for(int pos=31;pos>=0;pos--) {
 		if(board[pos] >= 0) { // if not empty or covered
 			int tmp;
 			if (board[pos] % 7 == 6) { // king
@@ -641,8 +641,10 @@ double MyAI::Evaluate(const ChessBoard* chessboard,
 		static const double values[14] = {
 			  1,180,  6, 18, 90,270,810,  
 			  1,180,  6, 18, 90,270,810
-		}; // pawn, gun, hourse, car, elephant, offical, king
+		}; // pawn, cannon, knight, rook, minister, guard, king
 		
+
+
 		double piece_value = 0;
 		for(int i = 0; i < 32; i++){
 			if(chessboard->Board[i] != CHESS_EMPTY && 
