@@ -320,9 +320,9 @@ void MyAI::MakeMove(ChessBoard* chessboard, const char move[6])
 	Pirnf_Chessboard();
 }
 
-void sort_four(int a[]) {
+void sort_four(const int* board, int a[]) {
     int large_1, large_2, small_1, small_2;
-    if (a[0] > a[1]) {
+    if (board[a[0]] > board[a[1]]) {
         large_1 = a[0];
         small_1 = a[1];
     } else {
@@ -330,7 +330,7 @@ void sort_four(int a[]) {
         small_1 = a[0];
     }
     
-    if (a[2] > a[3]) {
+    if (board[a[2]] > board[a[3]]) {
         large_2 = a[2];
         small_2 = a[3];
     } else {
@@ -338,11 +338,11 @@ void sort_four(int a[]) {
         small_2 = a[2];
     }
     
-    if (large_1 > large_2) {
+    if (board[large_1] > board[large_2]) {
         a[0] = large_1;
-        if (small_1 > small_2) {
+        if (board[small_1] > board[small_2]) {
             a[3] = small_2;
-            if (large_2 > small_1) {
+            if (board[large_2] > board[small_1]) {
                 a[1] = large_2;
                 a[2] = small_1;
             } else { // large_2 < small_1 && large_1 > large_2
@@ -356,9 +356,9 @@ void sort_four(int a[]) {
         }
     } else { // large_1 < large_2
         a[0] = large_2;
-        if (small_1 < small_2) { // small_1 < small_2 && large_1 < large_2
+        if (board[small_1] < board[small_2]) { // small_1 < small_2 && large_1 < large_2
             a[3] = small_1;
-            if (large_1 > small_2) {
+            if (board[large_1] > board[small_2]) {
                 a[1] = large_1;
                 a[2] = small_2;
             } else {
@@ -401,7 +401,7 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 		int character_num = color * 16 + i;
 		int Move[4] = {piece[character_num] - 4, piece[character_num] + 1,
 					   piece[character_num] + 4, piece[character_num] - 1};
-		sort_four(Move);
+		sort_four(board, Move);
 		for(int k=0; k<4;k++)
 		{
 			if(Move[k] >= 0 && Move[k] < 32 && Referee(board,piece[character_num],Move[k],color))
@@ -412,7 +412,7 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 		}
 	}
 
- 	// start from my offical, i initialize to 14 if my color is red, else i initialize to 30
+ 	// start from my guard, i initialize to 14 if my color is red, else i initialize to 30
 	for (int i = 14; i >= 5; i--) {
 		int character_num = color * 16 + i;
 
@@ -443,7 +443,7 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 		else // if my piece is not a gun
 		{
 			int Move[4] = {piece[character_num]-4,piece[character_num]+1,piece[character_num]+4,piece[character_num]-1}; // down, right, up, right
-			sort_four(Move);
+			sort_four(board, Move);
 			for(int k=0; k<4;k++)
 			{
 				if(Move[k] >= 0 && Move[k] < 32 && Referee(board,piece[character_num],Move[k],color))
@@ -460,7 +460,7 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 		int character_num = color * 16 + i;
 		int Move[4] = {piece[character_num] - 4, piece[character_num] + 1,
 					   piece[character_num] + 4, piece[character_num] - 1}; // down, right, up, right
-		sort_four(Move);
+		sort_four(board, Move);
 		for(int k=0; k<4;k++)
 		{
 			if(Move[k] >= 0 && Move[k] < 32 && Referee(board,piece[character_num],Move[k],color))
