@@ -2,7 +2,7 @@
 #include "time.h"
 #include "MyAI.h"
 
-#define TIME_LIMIT 9
+#define TIME_LIMIT 8
 
 #define WIN 1.0
 #define DRAW 0.2
@@ -320,6 +320,7 @@ void MyAI::MakeMove(ChessBoard* chessboard, const char move[6])
 	Pirnf_Chessboard();
 }
 
+// board[a[XXX]] may be out of bounds
 void sort_four(const int* board, int a[]) {
     int large_1, large_2, small_1, small_2;
     if (board[a[0]] > board[a[1]]) {
@@ -389,15 +390,13 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 			} else {
 				tmp = (board[pos] + board[pos] / 7) * 2 + 4;
 			}
-			
-			while (piece[tmp] >= 0) { // already have same character piece
-				tmp--;
-			}
+			// already have same character piece
+			while (piece[tmp] == true) { tmp--; }
 			piece[tmp] = pos;
 		};
 	}
 	// king's character_num = 15 or 31
-	for (int i = 15; i >= 15; i--) {
+	for (int i = 15; i >= 15 && piece[color * 16 + i] >= 0; i--) {
 		int character_num = color * 16 + i;
 		int Move[4] = {piece[character_num] - 4, piece[character_num] + 1,
 					   piece[character_num] + 4, piece[character_num] - 1};
@@ -431,7 +430,6 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 			}
 			for(int colCount=col; colCount<32;colCount += 4) // same column
 			{
-			
 				if(Referee(board,piece[character_num],colCount,color))
 				{
 					Result[ResultCount] = piece[character_num]*100+colCount;
@@ -456,7 +454,7 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 	}
 
 	// pawn's character_num = 0,1,2,3,4 or 16,17,18,19,20
-	for (int i = 4; i >= 0; i--) {
+	for (int i = 4; i >= 0 && piece[color * 16 + i] >= 0; i--) {
 		int character_num = color * 16 + i;
 		int Move[4] = {piece[character_num] - 4, piece[character_num] + 1,
 					   piece[character_num] + 4, piece[character_num] - 1}; // down, right, up, right
@@ -636,30 +634,67 @@ double MyAI::Evaluate(const ChessBoard* chessboard,
 		// score += DRAW - DRAW;
 		finish = true;
 	}else{ // no conclusion
-		// static material values
-		// cover and empty are both zero
-		static const double values[14] = {
-			  1,180,  6, 18, 90,270,810,  
-			  1,180,  6, 18, 90,270,810
-		}; // pawn, cannon, knight, rook, minister, guard, king
-		
+		static const double val_for_king[7] = {11000, 6000, 4000, 3000, 2300, 2000, 1500};
+		static const double val_not_king[10] = {11000, 4900, 2400, 1100, 500, 240, 110, 50, 20 ,8};
 
+		bool piece[32] = {0};
+		int pawn_count[2] = {0}; // pawn_count[color]
+		for(int pos = 0; pos < 32; pos++) {
+			// if not empty or covered
+			if(chessboard->Board[pos] != CHESS_EMPTY && chessboard->Board[pos] != CHESS_COVER) {
+				int tmp;
+				if (chessboard->Board[pos] % 7 == 6) { // king
+					tmp = (chessboard->Board[pos] + chessboard->Board[pos] / 7) * 2 + 3;
+				} else {
+					tmp = (chessboard->Board[pos] + chessboard->Board[pos] / 7) * 2 + 4;
+					if (chessboard->Board[pos] % 7 == 0) {
+						pawn_count[chessboard->Board[pos] / 7]++; // pawn_count[color] ++
+					}
+				}
+				// already have same character piece
+				while (piece[tmp] == true) { tmp--; }
+				piece[tmp] = true;
+			};
+		}
 
 		double piece_value = 0;
-		for(int i = 0; i < 32; i++){
-			if(chessboard->Board[i] != CHESS_EMPTY && 
-				chessboard->Board[i] != CHESS_COVER){
-				if(chessboard->Board[i] / 7 == this->Color){
-					piece_value += values[chessboard->Board[i]];
-				}else{
-					piece_value -= values[chessboard->Board[i]];
-				}
+		// king's piece value
+		if (piece[color * 16 + 15] == true && piece[(color^1) * 16 + 15] == true) { 
+			// if my king still alive and opp's king also alive
+			piece_value += val_for_king[pawn_count[(color^1)]+1];
+			piece_value -= val_for_king[pawn_count[color]+1];
+		} else if (piece[color * 16 + 15] == true && piece[(color^1) * 16 + 15] == false) {
+			// if my king still alive and opp's king died
+			piece_value += val_for_king[pawn_count[(color^1)]];
+		} else if (piece[color * 16 + 15] == false && piece[(color^1) * 16 + 15] == true) {
+			// if my king died and opp's king still alive
+			piece_value -= val_for_king[pawn_count[color]];
+		}
+
+		int bigger_enemy_count[2] = {0};
+		for (int i = 14; i >= 5; i--) { // start from guard
+			if (piece[color * 16 + i] == true && piece[(color^1) * 16 + i] == true) { 
+				// if my guard still alive and opp's guard also alive
+				bigger_enemy_count[(color^1)]++;
+				bigger_enemy_count[color]++;
+				piece_value += val_not_king[bigger_enemy_count[color] + int(piece[(color^1) * 16 + 15])];
+				piece_value -= val_not_king[bigger_enemy_count[(color^1)] + int(piece[color * 16 + 15])];
+			} else if (piece[color * 16 + i] == true && piece[(color^1) * 16 + i] == false) {
+				// if my guard still alive and opp's guard died
+				bigger_enemy_count[(color^1)]++;
+				piece_value += val_not_king[bigger_enemy_count[color] + int(piece[(color^1) * 16 + 15])];
+			} else if (piece[color * 16 + i] == false && piece[(color^1) * 16 + i] == true) {
+				// if my guard died and opp's guard still alive
+				bigger_enemy_count[color]++;
+				piece_value -= val_not_king[bigger_enemy_count[(color^1)] + int(piece[color * 16 + 15])];
 			}
 		}
-		// linear map to (-<WIN>, <WIN>)
-		// score max value = 1*5 + 180*2 + 6*2 + 18*2 + 90*2 + 270*2 + 810*1 = 1943
-		// <ORIGINAL_SCORE> / <ORIGINAL_SCORE_MAX_VALUE> * (<WIN> - 0.01)
-		piece_value = piece_value / 1943 * (WIN - 0.01);
+		// pawn's piece value
+		piece_value += val_not_king[bigger_enemy_count[color]] * pawn_count[color];
+		piece_value -= val_not_king[bigger_enemy_count[(color^1)]] * pawn_count[(color^1)];
+
+		// linear map
+		piece_value = piece_value / 165000 * (WIN - 0.01);
 		score += piece_value; 
 		finish = false;
 	}
