@@ -339,10 +339,10 @@ void MyAI::MakeMove(ChessBoard* chessboard, const char move[6])
 	Pirnf_Chessboard();
 }
 
-int GetIndex(unsigned int num) {
-	int count = 0;
-	for (; num != 0; count++) num = num >> 1;
-	return count - 1;
+int index32[32] = {31, 0, 1, 5, 2, 16, 27, 6, 3, 14, 17, 19, 28, 11, 7, 21, 30, 4, 15, 26, 13, 18, 10, 20, 29, 25, 12, 9, 24, 8, 23, 22};
+
+int GetIndex(unsigned int mask){
+	return index32[(mask * 0x08ED2BE6) >> 27];
 }
 
 // int MyAI::Expand(const int* board, const unsigned int* piece, const int color,int *Result)
