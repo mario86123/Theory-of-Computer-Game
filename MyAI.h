@@ -15,6 +15,8 @@
 
 struct ChessBoard{
 	int Board[32];
+	int piece_pos[32] = {-5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5,
+					 	 -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5};
 	int CoverChess[14];
 	int Red_Chess_Num, Black_Chess_Num;
 	int NoEatFlip;
@@ -89,7 +91,7 @@ private:
 	void MakeMove(ChessBoard* chessboard, const int move, const int chess);
 	void MakeMove(ChessBoard* chessboard, const char move[6]);
 	bool Referee(const int* board, const int Startoint, const int EndPoint, const int color);
-	int Expand(const int* board, const int color, int *Result);
+	int Expand(const int* board, const int* piece, const int color, int *Result);
 	double Evaluate(const ChessBoard* chessboard, const int legal_move_count, const int color);
 	double Nega_max(ChessBoard chessboard, int* move, const int color, const int depth, const int remain_depth, double alpha, double beta);
 	bool isDraw(const ChessBoard* chessboard);
