@@ -235,10 +235,9 @@ void MyAI::generateMove(char move[6])
 
 	double t = -DBL_MAX;
 	begin = clock();
-
 	// iterative-deeping, start from 3, time limit = <TIME_LIMIT> sec
 	// why depth start at 3 ??
-	for(int depth = 3; (double)(clock() - begin) / CLOCKS_PER_SEC < TIME_LIMIT; ++depth){
+	for(int depth = 3; (double)(clock() - begin) / CLOCKS_PER_SEC < TIME_LIMIT; depth+=2){
 		this->node = 0;
 		int best_move_tmp; double t_tmp;
 
@@ -281,24 +280,48 @@ void MyAI::generateMove(char move[6])
 	this->Pirnf_Chessboard();
 }
 
+int ConvertChessToPiecePosIndex(int chess_num) {
+	int tmp;
+	if (chess_num % 7 == 6) { // king
+		tmp = (chess_num + chess_num / 7) * 2 + 3;
+	} else {
+		tmp = (chess_num + chess_num / 7) * 2 + 4;
+	}
+	return tmp;
+}
+
 void MyAI::MakeMove(ChessBoard* chessboard, const int move, const int chess){
-	int src = move/100, dst = move%100;
+	int src = move/100, dst = move%100, idx = 0;
 	if(src == dst){ // flip
 		chessboard->Board[src] = chess;
 		chessboard->CoverChess[chess]--;
 		chessboard->NoEatFlip = 0;
+
+		idx = ConvertChessToPiecePosIndex(chess);
+		// already have same character piece
+		while (chessboard->piece_pos[idx] >= 0) { idx--; }
+		chessboard->piece_pos[idx] = src;
 	}else { // move
-		if(chessboard->Board[dst] != CHESS_EMPTY){
+		if(chessboard->Board[dst] != CHESS_EMPTY){ // attack
 			if(chessboard->Board[dst] / 7 == 0){ // red
 				(chessboard->Red_Chess_Num)--;
 			}else{ // black
 				(chessboard->Black_Chess_Num)--;
+				 // red eaten
 			}
 			chessboard->NoEatFlip = 0;
-		}else{
+
+			// search for eaten piece
+			idx = ConvertChessToPiecePosIndex(chessboard->Board[dst]);
+			while (chessboard->piece_pos[idx] != dst) { idx--; }
+			chessboard->piece_pos[idx] = -5;
+		}else{ // not attack
 			chessboard->NoEatFlip += 1;
 		}
 		chessboard->Board[dst] = chessboard->Board[src];
+		idx = ConvertChessToPiecePosIndex(chessboard->Board[src]);
+		while (chessboard->piece_pos[idx] != src) { idx--; }
+		chessboard->piece_pos[idx] = dst;
 		chessboard->Board[src] = CHESS_EMPTY;
 	}
 	chessboard->History[chessboard->HistoryCount++] = move;
@@ -374,33 +397,15 @@ void sort_four(const int* board, int a[]) {
     }
 }
 
-int MyAI::Expand(const int* board, const int color,int *Result)
+int MyAI::Expand(const int* board, const int* piece, const int color,int *Result)
 {
 	int ResultCount = 0;
-
-	// store every piece position
-	int piece[32] = {-5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5,
-					 -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5, -5};
-	
-	for(int pos=31;pos>=0;pos--) {
-		if(board[pos] >= 0) { // if not empty or covered
-			int tmp;
-			if (board[pos] % 7 == 6) { // king
-				tmp = (board[pos] + board[pos] / 7) * 2 + 3;
-			} else {
-				tmp = (board[pos] + board[pos] / 7) * 2 + 4;
-			}
-			// already have same character piece
-			while (piece[tmp] == true) { tmp--; }
-			piece[tmp] = pos;
-		};
-	}
 	// king's character_num = 15 or 31
 	for (int i = 15; i >= 15 && piece[color * 16 + i] >= 0; i--) {
 		int character_num = color * 16 + i;
 		int Move[4] = {piece[character_num] - 4, piece[character_num] + 1,
 					   piece[character_num] + 4, piece[character_num] - 1};
-		sort_four(board, Move);
+		// sort_four(board, Move);
 		for(int k=0; k<4;k++)
 		{
 			if(Move[k] >= 0 && Move[k] < 32 && Referee(board,piece[character_num],Move[k],color))
@@ -441,7 +446,7 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 		else // if my piece is not a gun
 		{
 			int Move[4] = {piece[character_num]-4,piece[character_num]+1,piece[character_num]+4,piece[character_num]-1}; // down, right, up, right
-			sort_four(board, Move);
+			// sort_four(board, Move);
 			for(int k=0; k<4;k++)
 			{
 				if(Move[k] >= 0 && Move[k] < 32 && Referee(board,piece[character_num],Move[k],color))
@@ -458,7 +463,7 @@ int MyAI::Expand(const int* board, const int color,int *Result)
 		int character_num = color * 16 + i;
 		int Move[4] = {piece[character_num] - 4, piece[character_num] + 1,
 					   piece[character_num] + 4, piece[character_num] - 1}; // down, right, up, right
-		sort_four(board, Move);
+		// sort_four(board, Move);
 		for(int k=0; k<4;k++)
 		{
 			if(Move[k] >= 0 && Move[k] < 32 && Referee(board,piece[character_num],Move[k],color))
@@ -636,62 +641,57 @@ double MyAI::Evaluate(const ChessBoard* chessboard,
 	}else{ // no conclusion
 		static const double val_for_king[7] = {11000, 6000, 4000, 3000, 2300, 2000, 1500};
 		static const double val_not_king[10] = {11000, 4900, 2400, 1100, 500, 240, 110, 50, 20 ,8};
-
-		bool piece[32] = {0};
+		static const double	static_val[7] = {11000, 4900, 2400, 1100, 500, 3000, 50};
+		// bool piece[32] = {0};
 		int pawn_count[2] = {0}; // pawn_count[color]
-		for(int pos = 0; pos < 32; pos++) {
-			// if not empty or covered
-			if(chessboard->Board[pos] != CHESS_EMPTY && chessboard->Board[pos] != CHESS_COVER) {
-				int tmp;
-				if (chessboard->Board[pos] % 7 == 6) { // king
-					tmp = (chessboard->Board[pos] + chessboard->Board[pos] / 7) * 2 + 3;
-				} else {
-					tmp = (chessboard->Board[pos] + chessboard->Board[pos] / 7) * 2 + 4;
-					if (chessboard->Board[pos] % 7 == 0) {
-						pawn_count[chessboard->Board[pos] / 7]++; // pawn_count[color] ++
-					}
-				}
-				// already have same character piece
-				while (piece[tmp] == true) { tmp--; }
-				piece[tmp] = true;
-			};
-		}
-
 		double piece_value = 0;
 		// king's piece value
-		if (piece[color * 16 + 15] == true && piece[(color^1) * 16 + 15] == true) { 
+		if (chessboard->piece_pos[color * 16 + 15] != -5 && chessboard->piece_pos[(color^1) * 16 + 15] != -5) { 
 			// if my king still alive and opp's king also alive
-			piece_value += val_for_king[pawn_count[(color^1)]+1];
-			piece_value -= val_for_king[pawn_count[color]+1];
-		} else if (piece[color * 16 + 15] == true && piece[(color^1) * 16 + 15] == false) {
+			piece_value += (val_for_king[pawn_count[(color^1)]+1] + static_val[0]);
+			piece_value -= (val_for_king[pawn_count[color]+1] + static_val[0]);
+		} else if (chessboard->piece_pos[color * 16 + 15] != -5 && chessboard->piece_pos[(color^1) * 16 + 15] == -5) {
 			// if my king still alive and opp's king died
-			piece_value += val_for_king[pawn_count[(color^1)]];
-		} else if (piece[color * 16 + 15] == false && piece[(color^1) * 16 + 15] == true) {
+			piece_value += (val_for_king[pawn_count[(color^1)]] + static_val[0]);
+		} else if (chessboard->piece_pos[color * 16 + 15] == -5 && chessboard->piece_pos[(color^1) * 16 + 15] != -5) {
 			// if my king died and opp's king still alive
-			piece_value -= val_for_king[pawn_count[color]];
+			piece_value -= (val_for_king[pawn_count[color]] + static_val[0]);
 		}
 
 		int bigger_enemy_count[2] = {0};
 		for (int i = 14; i >= 5; i--) { // start from guard
-			if (piece[color * 16 + i] == true && piece[(color^1) * 16 + i] == true) { 
+			if (chessboard->piece_pos[color * 16 + i] != -5 && chessboard->piece_pos[(color^1) * 16 + i] != -5) { 
 				// if my guard still alive and opp's guard also alive
 				bigger_enemy_count[(color^1)]++;
 				bigger_enemy_count[color]++;
-				piece_value += val_not_king[bigger_enemy_count[color] + int(piece[(color^1) * 16 + 15])];
-				piece_value -= val_not_king[bigger_enemy_count[(color^1)] + int(piece[color * 16 + 15])];
-			} else if (piece[color * 16 + i] == true && piece[(color^1) * 16 + i] == false) {
+				piece_value += (val_not_king[bigger_enemy_count[color] + int(chessboard->piece_pos[(color^1) * 16 + 15] != -5)] + static_val[(i-1)/2-1]);
+				piece_value -= (val_not_king[bigger_enemy_count[(color^1)] + int(chessboard->piece_pos[color * 16 + 15] != -5)] + static_val[(i-1)/2-1]);
+			} else if (chessboard->piece_pos[color * 16 + i] != -5 && chessboard->piece_pos[(color^1) * 16 + i] == -5) {
 				// if my guard still alive and opp's guard died
 				bigger_enemy_count[(color^1)]++;
-				piece_value += val_not_king[bigger_enemy_count[color] + int(piece[(color^1) * 16 + 15])];
-			} else if (piece[color * 16 + i] == false && piece[(color^1) * 16 + i] == true) {
+				piece_value += (val_not_king[bigger_enemy_count[color] + int(chessboard->piece_pos[(color^1) * 16 + 15] != -5)] + static_val[(i-1)/2-1]);
+			} else if (chessboard->piece_pos[color * 16 + i] == -5 && chessboard->piece_pos[(color^1) * 16 + i] != -5) {
 				// if my guard died and opp's guard still alive
 				bigger_enemy_count[color]++;
-				piece_value -= val_not_king[bigger_enemy_count[(color^1)] + int(piece[color * 16 + 15])];
+				piece_value -= (val_not_king[bigger_enemy_count[(color^1)] + int(chessboard->piece_pos[color * 16 + 15] != -5)] + static_val[(i-1)/2-1]);
 			}
 		}
 		// pawn's piece value
-		piece_value += val_not_king[bigger_enemy_count[color]] * pawn_count[color];
-		piece_value -= val_not_king[bigger_enemy_count[(color^1)]] * pawn_count[(color^1)];
+
+		// if opp's king still alive
+		if (chessboard->piece_pos[(color^1) * 16 + 15] != -5) {
+			// my pawn's value
+			piece_value += val_not_king[bigger_enemy_count[color]] * pawn_count[color];
+		} else { // if opp's king died
+			piece_value += val_not_king[9] * pawn_count[color];
+		}
+		// if my king still alive
+		if (chessboard->piece_pos[color * 16 + 15] != -5) {
+			// opp's pawn's value
+			piece_value -= val_not_king[bigger_enemy_count[(color^1)]] * pawn_count[(color^1)];
+		} else { // if my king died
+			piece_value -= val_not_king[9] * pawn_count[(color^1)];
+		}
 
 		// linear map
 		piece_value = piece_value / 165000 * (WIN - 0.01);
@@ -730,7 +730,7 @@ double MyAI::Nega_max(const ChessBoard chessboard, int* move, const int color, c
 
 	// move
 	// check every possible move and store them in Moves array
-	move_count = Expand(chessboard.Board, color, Moves);
+	move_count = Expand(chessboard.Board, chessboard.piece_pos, color, Moves);
 
 	if(isTimeUp() || // time is up
 		remain_depth == 0 || // reach limit of depth
@@ -742,7 +742,7 @@ double MyAI::Nega_max(const ChessBoard chessboard, int* move, const int color, c
 		// odd: *-1, even: *1
 		return Evaluate(&chessboard, move_count, color) * (depth&1 ? -1 : 1);
 	}else{
-		double m = alpha;
+		double m = -DBL_MAX;
 		int new_move;
 		// search deeper
 		for(int i = 0; i < move_count; i++){ // move
@@ -750,7 +750,7 @@ double MyAI::Nega_max(const ChessBoard chessboard, int* move, const int color, c
 			
 			MakeMove(&new_chessboard, Moves[i], 0); // 0: dummy
 			// move every possible move
-			double t = -Nega_max(new_chessboard, &new_move, color^1, depth+1, remain_depth-1, -beta, -m);
+			double t = -Nega_max(new_chessboard, &new_move, color^1, depth+1, remain_depth-1, -beta, - ((m>alpha)?m:alpha));
 			// c++ ^ operator is xor (color xor 1)
 			if(t > m){ 
 				m = t;
@@ -760,7 +760,7 @@ double MyAI::Nega_max(const ChessBoard chessboard, int* move, const int color, c
 				if(r) *move = Moves[i];
 			}
 			if (m >= beta) {
-				return beta;
+				return m;
 			}
 		}
 		return m;
