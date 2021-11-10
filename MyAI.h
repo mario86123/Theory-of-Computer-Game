@@ -15,7 +15,7 @@
 
 struct ChessBoard{
 	int Board[32];
-	unsigned int piece[16] = {0};
+	unsigned int piece[14] = {0};
 	unsigned int color[2] = {0}; // red black filter
 	int CoverChess[14];
 	int Red_Chess_Num, Black_Chess_Num;
@@ -74,8 +74,13 @@ private:
 	int Color;
 	int Red_Time, Black_Time;
 	ChessBoard main_chessboard;
-	clock_t begin;
 	bool timeIsUp;
+
+#ifdef WINDOWS
+	clock_t begin;
+#else
+	struct timeval begin;
+#endif
 	
 	// statistics
 	int node;

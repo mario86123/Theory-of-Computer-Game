@@ -1,8 +1,14 @@
 #include "float.h"
-#include "time.h"
+
+#ifdef WINDOWS
+#include <time.h>
+#else
+#include <sys/time.h>
+#endif
+
 #include "MyAI.h"
 
-#define TIME_LIMIT 8
+#define TIME_LIMIT 9.5
 
 #define WIN 1.0
 #define DRAW 0.2
@@ -234,16 +240,23 @@ void MyAI::generateMove(char move[6])
 	int EndPoint = 0;
 
 	double t = -DBL_MAX;
+	
+#ifdef WINDOWS
 	begin = clock();
+#else
+	gettimeofday(&begin, 0);
+#endif
+
 	// iterative-deeping, start from 3, time limit = <TIME_LIMIT> sec
 	// why depth start at 3 ??
-	for(int depth = 3; (double)(clock() - begin) / CLOCKS_PER_SEC < TIME_LIMIT; ++depth){
+	for(int depth = 3; !isTimeUp(); ++depth){
 		this->node = 0;
 		int best_move_tmp; double t_tmp;
 
 		// run Nega-max
 		t_tmp = Nega_max(this->main_chessboard, &best_move_tmp, this->Color, 0, depth, -DBL_MAX, DBL_MAX);
 		t_tmp -= OFFSET; // rescale
+
 		// check score
 		// if search all nodes
 		// replace the move and score
@@ -551,13 +564,11 @@ int hammingWeight(unsigned int n) {
 	}
 	return hamWt;
 }
-static const double values[14] = {
-		1,180,  6, 18, 90,270,810,  
-		1,180,  6, 18, 90,270,810
-};
+
 // Evaluating function
 // always use my point of view, so use this->Color
-double MyAI::Evaluate(const ChessBoard* chessboard, const int legal_move_count, const int color){
+double MyAI::Evaluate(const ChessBoard* chessboard, 
+	const int legal_move_count, const int color){
 	// score = My Score - Opponent's Score
 	// offset = <WIN + BONUS> to let score always not less than zero
 
@@ -577,6 +588,10 @@ double MyAI::Evaluate(const ChessBoard* chessboard, const int legal_move_count, 
 	}else{ // no conclusion
 		// static material values
 		// cover and empty are both zero
+		static const double values[14] = {
+			  1,180,  6, 18, 90,270,810,  
+			  1,180,  6, 18, 90,270,810
+		};
 
 		double piece_value = 0;
 		for(int i = 0; i < 32; i++){
@@ -596,6 +611,7 @@ double MyAI::Evaluate(const ChessBoard* chessboard, const int legal_move_count, 
 		score += piece_value; 
 		finish = false;
 	}
+
 	// Bonus (Only Win / Draw)
 	if(finish){
 		if((this->Color == RED && chessboard->Red_Chess_Num > chessboard->Black_Chess_Num) ||
@@ -628,6 +644,7 @@ double MyAI::Nega_max(const ChessBoard chessboard, int* move, const int color, c
 	// move
 	// check every possible move and store them in Moves array
 	move_count = Expand(chessboard.Board, chessboard.piece, chessboard.color[color], color, Moves);
+	// printf("%d\n", depth);
 
 	if(isTimeUp() || // time is up
 		remain_depth == 0 || // reach limit of depth
@@ -637,24 +654,18 @@ double MyAI::Nega_max(const ChessBoard chessboard, int* move, const int color, c
 		){
 		this->node++;
 		// odd: *-1, even: *1
-		return 0;
+		// printf("e: %f\n", Evaluate(&chessboard, move_count, color) * (depth&1 ? -1 : 1));
+		return Evaluate(&chessboard, move_count, color) * (depth&1 ? -1 : 1);
 	}else{
-		double m = alpha;
+		double m = -DBL_MAX;
 		int new_move;
-		int piece_count[14] = {0};
-    
 		// search deeper
 		for(int i = 0; i < move_count; i++){ // move
 			ChessBoard new_chessboard = chessboard;
-			// move every possible move
-			MakeMove(&new_chessboard, Moves[i], 0); // 0: dummy
 			
-			double t = 0;
-			if (chessboard.Board[Moves[i] % 100] != CHESS_EMPTY) {
-				t += values[chessboard.Board[Moves[i] % 100]] / 1943;
-			}
-
-			t -= Nega_max(new_chessboard, &new_move, color^1, depth+1, remain_depth-1, -beta, - ((m>alpha)?m:alpha));
+			MakeMove(&new_chessboard, Moves[i], 0); // 0: dummy
+			// move every possible move
+			double t = -Nega_max(new_chessboard, &new_move, color^1, depth+1, remain_depth-1, -beta, - ((m>alpha)?m:alpha));
 			// c++ ^ operator is xor (color xor 1)
 			if(t > m){ 
 				m = t;
@@ -710,7 +721,21 @@ bool MyAI::isDraw(const ChessBoard* chessboard){
 }
 
 bool MyAI::isTimeUp(){
-	this->timeIsUp = ((double)(clock() - begin) / CLOCKS_PER_SEC >= TIME_LIMIT);
+	double elapsed; // ms
+	
+	// design for different os
+#ifdef WINDOWS
+	clock_t end = clock();
+	elapsed = (end - begin);
+#else
+	struct timeval end;
+	gettimeofday(&end, 0);
+	long seconds = end.tv_sec - begin.tv_sec;
+	long microseconds = end.tv_usec - begin.tv_usec;
+	elapsed = (seconds*1000 + microseconds*1e-3);
+#endif
+
+	this->timeIsUp = (elapsed >= TIME_LIMIT*1000);
 	return this->timeIsUp;
 }
 
@@ -807,4 +832,3 @@ void MyAI::Pirnf_Chess(int chess_no,char *Result){
 			break;
 	}
 }
-
